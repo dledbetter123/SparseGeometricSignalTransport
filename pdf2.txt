@@ -1,0 +1,2720 @@
+Under review as a conference paper at ICLR 2025
+
+000
+001
+002
+003
+004
+005
+006
+007
+008
+009
+010
+011
+
+Gauge Fiber Bundle Geometry of Transformers
+Anonymous authors
+Paper under double-blind review
+
+Abstract
+We give a geometry-first account of Transformers with GeLU. On a generic
+regular set of parameters, the head-wise symmetry group acts freely and
+properly, so the parameter space fibers over a quotient of functionally distinct models—a clean principal-bundle picture with gauge orbits as fibers
+and function-changing directions as horizontals. Using the empirical Fisher
+(Fisher–Rao) metric yields a canonical horizontal distribution and clarifies that the natural gradient is the horizontal Riesz representative of the
+Euclidean gradient (reducing to orthogonal projection only in a special
+case). Within this framework, attention behaves like a connection with
+generically nonzero curvature (path-dependent transport), while the feedforward block is largely fiber-preserving with a dimension-controlled nearorthogonality to attention. We turn these ideas into practical diagnostics—a least-squares, gauge-aware gradient split and a small-loop holonomy estimator—then report Euclidean-proxy consistency checks aligning
+with the theory; full Fisher–Rao evaluations are presented as algorithms
+for future work. Architectural choices such as RoPE appear as principled
+gauge reductions (e.g., per-head Q/K dimension from d2k to dk ).
+
+012
+013
+014
+015
+016
+017
+018
+019
+020
+021
+022
+023
+024
+025
+026
+027
+028
+029
+030
+031
+032
+033
+034
+035
+036
+037
+038
+039
+040
+041
+042
+043
+044
+045
+046
+047
+048
+049
+050
+051
+052
+053
+
+1
+
+Introduction
+
+Transformer architectures exhibit extensive parameter symmetries. In particular, head-wise
+transformations that preserve the realized function create large gauge orbits in parameter
+space and obscure the geometry of optimization. A principled analysis therefore requires
+isolating directions tangent to gauge orbits from directions that modify the function, and
+studying learning on the resulting quotient manifold.
+Preliminaries. Let π : Θ0 → Q denote the parameter–function map on a regular
+(Zariski–open) subset Θ0 of parameters. The fibers of π are gauge orbits of a Lie group G,
+and Tθ Θ admits the gθ –orthogonal decomposition Tθ Θ = Vθ ⊕ Hθ into vertical directions
+Vθ = kerdπθ and horizontal directions Hθ . A principal connection specifies Hθ smoothly;
+its connection 1–form ω has curvature Ω = dω + 12 [ω, ω], which governs holonomy on Q.
+Throughout, the horizontal distribution is chosen as the Fisher–Rao (FR) orthogonal com⊥g
+plement Hθ = Vθ θ associated with the empirical Fisher metric gθ .
+This paper provides a self–contained geometric formulation for Transformers with GeLU
+activations. On the regular stratum Θ0 , the head–wise maximal symmetry group Gmax =
+((GL(dk ))h × (GL(dv ))h ) ⋊ Sh acts freely and properly, hence π : Θ0 → Q := Θ0 /Gmax is a
+principal Gmax –bundle (Theorem 2.3). The FR connection yields a canonical horizontal/vertical split. In this geometry, the natural gradient is the horizontal Riesz representative of
+the Euclidean gradient,
+⊤
+e = (Gθ|H )† PH
+∇L
+∇L,
+θ
+θ
+reducing to gθ –orthogonal projection only in the special case Gθ|Hθ = I (Theorem 3.2). The
+attention mechanism induces an Ehresmann connection on the representation bundle with
+nonzero curvature on a Zariski–open subset of Θ0 (Theorem 4.1), whereas the feed–forward
+block produces gradients that are predominantly vertical and nearly orthogonal to attention
+in the FR metric, with a dimension–controlled bound (Proposition 4.2).
+1
+
+Under review as a conference paper at ICLR 2025
+
+054
+055
+056
+057
+058
+059
+060
+061
+062
+063
+064
+065
+066
+067
+068
+069
+070
+071
+072
+073
+074
+075
+076
+077
+078
+079
+080
+081
+082
+083
+084
+085
+086
+087
+088
+
+Two diagnostic procedures follow from this framework. First, a metric–aware least–squares
+decomposition of a gradient into vertical and horizontal components (Algorithm 1). Second,
+a small–loop holonomy estimator with Richardson extrapolation whose bias is O(ε3 ) (Algorithm 2; Theorem 5.1). All empirical results in this submission use Euclidean inner products
+as computationally tractable proxies for FR quantities; they provide conservative validation
+of the predicted geometry (Section 7). FR–exact procedures are stated and analyzed but
+deferred to future large–scale evaluation.
+The scope and assumptions are explicit. We consider standard Transformer blocks with
+GeLU and fixed widths. Results are proved on a generic stratum Θ0 where the relevant
+projection operators have full column rank; outside Θ0 stabilizers increase and the action
+is stratified by orbit type. Architectural variants fit naturally: rotary position embeddings
+(RoPE) restrict the Q/K factor to the plane–wise commutant, reducing the per–head gauge
+dimension from d2k to dk , while grouped/multi–query attention ties symmetry factors across
+heads. The presentation proceeds as follows: Section 2 establishes maximal symmetry
+and the principal–bundle structure; Section 3 develops the FR connection and the natural
+gradient; Section 4 proves attention curvature and FFN near–verticality; Section 5 presents
+the diagnostics and their complexity; Section 6 gives the quotient Morse–Bott view; Section 7
+reports Euclidean–proxy evidence. Proofs appear in the appendix.
+
+2
+
+Maximal Gauge Symmetry and the Principal Bundle
+
+We write h for the number of heads, dk and dv for key/query and value widths, and dmodel
+for the model dimension. A single multi-head attention (MHA) layer is parameterized by
+ (i)
+(i)
+(i)
+θ = (WQ , WK , WV )hi=1 , WO ,
+and a depth-L model by (θ1 , . . . , θL ). The parameter manifold is an open set Θ ⊂ RD ,
+and π : Θ → Q denotes the parameter–function map to the quotient of functionally distinct
+models.
+Definition 2.1 (Generic stratum). Let Θ0 ⊂ Θ be the set of parameters such that, for every
+head i in every layer:
+(i)
+
+(i)
+
+(i)
+
+(G1) rank(WQ ) = rank(WK ) = dk and rank(WV ) = dv ;
+(G2) dmodel = h dv ;
+
+(G3) ( Softmax Jacobian nondegeneracy) for the fixed evaluation batch used to define gθ , the
+Jacobian of the attention weights with respect to pre-softmax logits has full row rank at
+every token position. Equivalently, the score map varies along at least two independent
+089
+horizontal directions locally (no collapsed/constant softmax across all heads).
+090
+091
+092
+093
+094
+095
+096
+097
+098
+099
+100
+101
+102
+103
+104
+105
+106
+107
+
+This set is Zariski–open and therefore of full measure.
+Intuition for freeness and properness. On Θ0 , the full-column-rank conditions forbid
+(i)
+(σ(i))
+(i)
+nontrivial stabilizers: if g = (Ai , Ci ; σ) satisfies g·θ = θ, then WQ Ai = WQ
+, WK A−⊤
+=
+i
+(σ(i))
+
+(i)
+
+(σ(i))
+
+WK
+, WV Ci = WV
+and Ci−1 WO = WO force (by identifiability and (G3)) Ai =
+Ci = I and σ = e, hence freeness. Properness follows from the closed-graph criterion for
+matrix-group actions: if gn ·θn → θ′ with θn → θ ∈ Θ0 , then the full-rank bounds imply
+(gn ) is bounded and has a convergent subsequence; see Appendix A for details.
+Two families of changes of basis preserve the realized function: invertible transforms in the
+Q/K channels for each head, and invertible transforms in the V channels paired with a
+compensating block in WO ; heads may also be permuted. The resulting symmetry group is
+
+
+Gmax = (GL(dk ))h × (GL(dv ))h ⋊ Sh ,
+acting by
+
+(i)
+(i)
+(i)
+(i)
+(WQ , WK ) 7→ WQ Ai , WK A−⊤
+,
+i
+
+
+(i)
+(i)
+(WV , WO,i ) 7→ WV Ci , Ci−1 WO,i ,
+
+for (Ai ) ∈ (GL(dk ))h , (Ci ) ∈ (GL(dv ))h , and by σ ∈ Sh permuting heads.
+2
+
+Under review as a conference paper at ICLR 2025
+
+108
+109
+110
+111
+112
+113
+114
+115
+116
+117
+118
+119
+120
+121
+122
+123
+124
+125
+126
+127
+128
+129
+130
+131
+132
+133
+134
+135
+136
+137
+138
+139
+140
+141
+142
+143
+144
+145
+146
+147
+148
+149
+150
+151
+152
+153
+154
+155
+156
+157
+158
+159
+160
+161
+
+Theorem 2.2 (Maximal gauge group for a single attention layer). On Θ0 , the group of all
+parameter transformations that preserve the multi-head attention block equals
+
+
+Gmax = (GL(dk ))h × (GL(dv ))h ⋊ Sh ,
+acting head-wise as above. No additional continuous or discrete symmetries exist.
+Proof reference. Appendix A.1, which establishes sufficiency, attention-weight identifiability
+up to permutation, Lie-algebra characterization, block-diagonality (no cross-head mixing
+beyond Sh ), and completeness.
+Theorem 2.3 (Principal bundle on the generic stratum). Let Gmax act as above. On
+the Zariski–open regular stratum Θ0 the action is free and proper; hence π : Θ0 → Q :=
+Θ0 /Gmax is a principal Gmax –bundle.
+Proof reference. Lemmas A.7 and A.8 in Appendix A.
+Corollary 2.4 (Head sharing (GQA/MQA)). If the h heads are partitioned into g key/value
+groups with shared (WK , WV ) per group, then on the corresponding generic stratum the
+continuous symmetry reduces to (GL(dk ))g × (GL(dv ))g tied per group, with permutations
+Sh × Sg acting discretely.
+Corollary 2.5 (RoPE reduction). Under rotary position embeddings with a nondegenerate
+frequency schedule and even dk , the Q/K factor reduces on each 2 × 2 plane to the real
+commutant {aI + bJ} ∼
+= GL(1, C), giving
+
+GRoPE = (CRoPE )h × (GL(dv ))h ⋊ Sh , CRoPE ∼
+= GL(1, C)dk /2 .
+Consequently, the per-head Q/K gauge dimension drops from d2k to dk .
+Corollary 2.6 (Layerwise product). For a depth-L model without cross-layer parameter
+sharing, the model-level gauge group is the direct product
+Gmodel ∼
+=
+
+L
+Y
+ℓ=1
+
+G(ℓ)
+max
+
+(or
+
+L
+Y
+ℓ=1
+
+(ℓ)
+Gshare ,
+
+L
+Y
+
+(ℓ)
+
+GRoPE in the corresponding variants).
+
+ℓ=1
+
+Corollary 2.7 (Continuous dimension). For a single layer, dimR G◦max = h(d2k + d2v ); with
+RoPE, dimR G◦RoPE = h(dk + d2v ); with head sharing into g groups, replace h by g in these
+counts.
+Geometric consequences. Theorem 2.3 identifies the vertical space Vθ = kerdπθ as the
+tangent to the gauge orbit. In Section 3 we equip Θ0 with the empirical Fisher metric and
+define the Fisher–Rao (mechanical) connection by the gθ -orthogonal split Tθ Θ = Vθ ⊕ Hθ ,
+which underpins the optimization and curvature results that follow.
+
+3
+
+Fisher–Rao Connection and Natural Gradient
+
+By Theorem 2.3, the parameter–to–function map π : Θ0 → Q is a principal bundle. At
+θ ∈ Θ0 , the vertical space
+Vθ = kerdπθ
+is the tangent to the gauge orbit through θ. To isolate the directions that change the realized
+function, we equip Θ0 with the empirical Fisher (Fisher–Rao) metric gθ (fixed evaluation
+batch) and define the horizontal complement
+⊥g
+
+Hθ = Vθ θ .
+This gθ –orthogonal splitting Tθ Θ0 = Vθ ⊕ Hθ is the Fisher–Rao (mechanical) connection.
+Lemma 3.1 (Gauge-null gradient directions). If L : Θ0 → R is gauge-invariant, then
+dLθ [v] = 0 for all v ∈ Vθ . Equivalently, the Riesz representative of dLθ with respect to gθ
+lies in Hθ .
+
+3
+
+Under review as a conference paper at ICLR 2025
+
+162
+163
+164
+165
+166
+167
+168
+169
+170
+171
+172
+173
+174
+175
+176
+177
+178
+179
+180
+181
+182
+183
+184
+185
+186
+187
+188
+189
+190
+191
+192
+193
+194
+195
+196
+197
+198
+199
+200
+201
+202
+203
+204
+205
+206
+207
+208
+209
+210
+211
+212
+213
+214
+215
+
+Proof. See Appendix B.
+The natural (Riemannian) gradient is characterized intrinsically by
+e w) = ⟨∇L, w⟩
+gθ (∇L,
+
+for all w ∈ Tθ Θ0 ,
+
+and, by Lemma 3.1, must be horizontal. The following makes this precise.
+Theorem 3.2 (Natural gradient as horizontal Riesz representative). With the Fisher–Rao
+e ∈ Hθ such that
+connection, the natural gradient at θ is the unique vector ∇L
+e w) = ⟨∇L, w⟩
+gθ (∇L,
+
+∀ w ∈ T θ Θ0 ,
+
+equivalently
+e = (Gθ|H )† P⊤ ∇L,
+∇L
+Hθ
+θ
+where Gθ|Hθ is the Fisher information restricted to Hθ and PHθ is the Euclidean projector.
+It reduces to the Euclidean orthogonal projection onto Hθ only when Gθ|Hθ = I.
+e uniquely miniProof. Appendix B. An equivalent variational form is: among u ∈ Hθ , ∇L
+1
+mizes 2 gθ (u, u) − ⟨∇L, u⟩.
+For later use we record the FR-orthogonal decomposition against a vertical generator set
+{vj }m
+j=1 :
+X
+Gij = gθ (vi , vj ),
+bi = gθ (vi , u),
+c = G−1 b,
+uvert =
+cj vj , uhor = u − uvert .
+j
+
+Section 5 turns this into an explicit procedure (and its Euclidean proxy); empirical results
+in Section 7 use the proxy for tractability, with the FR-exact formulas here serving as the
+mathematical ground truth.
+e = (Gθ|H )† P ⊤ ∇L
+Remark 3.3 (Not merely an orthogonal projection). The expression ∇L
+Hθ
+θ
+is the Riesz representative of the gradient functional restricted to Hθ . It coincides with
+gθ –orthogonal projection onto Hθ only in the special case Gθ|Hθ = I.
+
+4
+
+Attention Curvature and FFN Near-Verticality
+
+The Fisher–Rao connection in Section 3 lives on parameters. On the representation side,
+fix a layer and view token features as sections of a bundle whose fibers are the per-token
+feature spaces, with heads acting in parallel. The attention update transports features along
+data–dependent directions—precisely the setting where an Ehresmann connection and its
+curvature organize what “path dependence” means.
+Theorem 4.1 (Attention induces a connection with nonzero curvature). Standard multihead attention (with GeLU in the surrounding block) induces an Ehresmann connection on
+the representation bundle. On the generic stratum of Definition 2.1, its curvature twoform Ω is generically nonzero. In particular, for gθ -orthonormal horizontal directions u, v,
+transporting around a small rectangle produces a nontrivial gauge displacement proportional
+to Ω(u, v).
+Proof. Appendix C. The argument linearizes the attention update, identifies the induced
+horizontal distribution, and uses a Baker–Campbell–Hausdorff expansion; GeLU smoothness
+ensures the required regularity. We also give the small-loop relation and its O(ε3 ) remainder
+used in the estimator.
+Where attention mixes information across tokens (and so bends horizontal directions), the
+position-wise feed–forward block acts pointwise. In Fisher geometry this split shows up in
+the relative size and angle of their gradients.
+Proposition 4.2 (FFN near-verticality and separation from attention). Measure norms
+and angles with the Fisher–Rao metric of Section 3. On the generic stratum, the FFN
+4
+
+Under review as a conference paper at ICLR 2025
+
+216
+217
+218
+219
+220
+221
+222
+223
+224
+225
+226
+227
+228
+229
+230
+231
+232
+233
+234
+235
+236
+237
+238
+239
+240
+241
+242
+243
+244
+245
+246
+247
+248
+249
+250
+251
+252
+253
+254
+255
+256
+257
+258
+259
+260
+261
+262
+263
+264
+265
+266
+267
+268
+269
+
+gradient is predominantly vertical—its horizontal component is small compared to its vertical
+component—and its angle to the attention gradient obeys a dimension–controlled bound
+p
+
+cos ∠g ∇FFN , ∇Att ≲ C dhead /dmodel ,
+for a constant C depending smoothly on activation and normalization. In particular, when
+dmodel ≫ dhead , the two gradients are nearly orthogonal.
+Proof. Appendix D. The key inputs are the block-diagonal (tokenwise) Jacobian of the FFN,
+the headwise mixing structure of attention, and the concatenation constraint dmodel = h dv .
+Two brief comments help connect theory to practice. First, nonzero curvature is the geometric statement behind “context sensitivity”: the order of horizontal transports matters up to
+a gauge action. Section 5 turns this into a small-loop holonomy estimator with Richardson
+extrapolation and O(ε3 ) error. Second, while all statements here are in the Fisher–Rao
+metric, our experiments report Euclidean proxies for scalability (Section 7); these provide
+conservative surrogates—Euclidean angles lower–bound Fisher angles and Euclidean vertical
+fractions upper–bound horizontal leakage—without changing the theorems above.
+
+5
+
+Diagnostics and Complexity
+
+Two concrete procedures make the geometry from Sections 3 and 4 operational. The first
+resolves a vector into its gauge (vertical) and function-changing (horizontal) parts with
+respect to the Fisher–Rao metric. The second turns curvature into a measurable small-loop
+effect. We use the first with Euclidean inner products in Section 7 as a scalable proxy;
+the second is presented here with guarantees and left for future large-scale Fisher–Rao
+evaluation.
+Gauge–aware decomposition. Let {vj }m
+j=1 span the vertical space Vθ to tolerance. Define
+the Fisher–Rao Gram Gij = gθ (vi , vj ) and the correlations bi = gθ (vi , u) for a vectorPu (e.g.,
+u = ∇L). The FR-orthogonal vertical component uvert solves Gc = b, and uvert = j cj vj ;
+the horizontal component is uhor = u − uvert . The Euclidean proxy replaces gθ by the dot
+product: stack A = [ vec(v1 ) · · · vec(vm ) ], then (A⊤ A)c = A⊤ u. In practice we stabilize
+with thin-QR and column-pivoting; these choices do not change the FR definition.
+Algorithm 1 Gauge–aware gradient decomposition (Fisher–Rao)
+Require: parameter θ ∈ Θ0 ; vertical generators {vj }m
+j=1 ; vector u; FR metric gθ
+1: Gij ← gθ (vi , vj ), bi ← gθ (vi , u)
+2: Solve (GP
++ λI)c = b (Cholesky/CG; optional λ ≥ 0)
+3: uvert ← j cj vj , uhor ← u − uvert
+4: return (uvert , uhor ) and vertical fraction ∥uvert ∥/∥u∥
+From curvature to holonomy. For gθ -orthonormal u, v ∈ Hθ , consider the horizontal
+loop that moves by +εu, +εv, then returns by −εu, −εv.
+Theorem 5.1 (Small-loop holonomy scaling). The induced gauge displacement ∆□ε (u, v)
+obeys
+∥∆□ε (u, v)∥ = ε2 ∥Ωθ (u, v)∥ + O(ε3 ),
+where Ωθ is the curvature two-form of the Fisher–Rao connection at θ.
+Algorithm 2 Holonomy estimator with Richardson extrapolation
+Require: θ; gθ -orthonormal u, v ∈ Hθ ; steps ε > ε′ > 0
+1: For each δ ∈ {ε, ε′ }, traverse the horizontal loop using FR projection at each leg
+2: Compute ∆□δ (u, v) (Lie-algebra coordinates via a log map)
+3: h(δ) ← ∥∆□δ (u, v)∥/δ 2
+4h(ε/2) − h(ε)
+4: return h∗ ←
+(Richardson; error O(ε2 ))
+3
+
+5
+
+Under review as a conference paper at ICLR 2025
+
+270
+271
+272
+273
+274
+275
+276
+277
+278
+279
+280
+281
+282
+283
+284
+285
+286
+287
+288
+289
+290
+291
+292
+293
+294
+295
+296
+297
+298
+299
+300
+301
+302
+303
+304
+305
+306
+307
+308
+309
+310
+311
+312
+313
+314
+315
+316
+317
+318
+319
+320
+321
+322
+323
+
+Table 1: Cost at a glance for one layer (parameter dim D, generators m = h(d2k +d2v ); with
+RoPE: m = h(dk +d2v )).
+Procedure
+
+Leading cost
+⊤
+
+2
+
+Notes
+3
+
+Euclidean vertical split
+form A A: O(m D); solve: O(m )
+CG: O(mD) per matvec
+FR vertical split
+form Gram G: O(m2 ·FisherEval); solve: O(m3 )
+Heavy for m ≳ 104
+Holonomy (loop + LS)
+4 flows + LS on g
+Richardson reduces O(ε3 ) bias
+
+Cost at a glance. Let m = h(d2k +d2v ) (RoPE reduces d2k → dk per head). Forming A⊤ A
+costs O(m2 D) for parameter dimension D, and solving costs O(m3 ) (or CG with matvec
+O(mD)). At h=12, dk =dv =64, one has m ≈ 98,304, so FR projectors and holonomy become
+heavy; we therefore use Euclidean proxies in Section 7 and expose FR-exact procedures here
+for future evaluation.
+These two diagnostics tie the abstract calculus to practice: the first reports how much of a
+step is “just gauge,” the second quantifies the path dependence predicted by curvature. In
+Section 7 we read existing Euclidean measurements through this lens; FR-exact holonomy
+is left for future large-scale runs.
+
+6
+
+Optimization on the Quotient: A Morse–Bott View
+
+Gauge symmetry means many parameter settings realize the same function. On the total
+space Θ0 this appears as flat directions tangent to gauge orbits; on the quotient Q =
+Θ0 /Gmax those directions disappear and the landscape reflects genuine functional change.
+The right language is Morse–Bott: critical sets in Θ0 are manifolds (orbits), while the
+induced problem on Q is Morse once we restrict to horizontal directions.
+Theorem 6.1 (Gauge orbits as critical manifolds; Morse behavior on the quotient). Let
+L : Θ0 → R be gauge-invariant and let θ ∈ Θ0 be critical. Then the entire orbit Gmax ·θ lies
+in the critical set, the Hessian ∇2 L(θ) vanishes on the vertical space Vθ = kerdπθ , and its
+horizontal restriction on Hθ is well defined. Writing ℓ : Q → R for the induced loss, [θ] is
+critical for ℓ and has nondegenerate Hessian equal to the horizontal restriction of ∇2 L(θ).
+In particular, ℓ is Morse at [θ] whenever the horizontal Hessian is nondegenerate.
+Proof. Appendix E. The argument uses the slice construction around a free, proper orbit
+and the horizontal/vertical split from Section 3.
+Two consequences are worth keeping in mind. First, methods that suppress vertical components—see Algorithm 1—are aligned with the true second-order structure of the quotient
+problem: they follow directions that actually change the function. Second, small horizontal
+steps can move far in Euclidean parameter norm while staying close in function space, which
+explains why Euclidean distances often overstate functional change and why seemingly “distant” minima in Θ0 can sit in the same basin on Q.
+The result is local to the generic stratum: near Θ0 the bundle picture applies cleanly; away
+from it stabilizers may grow and the space stratifies. Our empirical reading in Section 7 stays
+within Θ0 and interprets existing (Euclidean-proxy) measurements through this quotient
+lens.
+
+7
+
+Empirical Consistency Checks (Euclidean Proxies)
+
+All measurements in this section use Euclidean inner products as computationally tractable proxies for the Fisher–Rao geometry. They provide conservative
+validation of the bundle predictions: Euclidean angles lower bound Fisher–Rao angles, and
+Euclidean vertical fractions upper bound horizontal leakage. These proxies are consistent
+with the theory but do not constitute full Fisher–Rao validation. FR–exact procedures appear in Section 5 and proofs in the appendix; we do not add new runs beyond the existing
+computations reported here.
+
+6
+
+Under review as a conference paper at ICLR 2025
+
+325
+326
+327
+328
+329
+330
+331
+332
+333
+334
+335
+336
+337
+338
+339
+340
+341
+342
+343
+344
+345
+346
+347
+348
+349
+350
+351
+352
+
+Table 2: Gauge invariance (relative errors across 100 trials). Outputs remain invariant up
+to machine precision.
+Metric
+Mean relative difference
+Maximum relative difference
+Std. deviation
+Minimum relative difference
+7.1
+
+365
+366
+367
+368
+369
+370
+371
+372
+373
+374
+375
+376
+377
+
+Interpretation
+−15
+
+2.68 × 10
+2.86 × 10−15
+9.41 × 10−17
+2.52 × 10−15
+
+Machine precision
+≈ 13 εmach
+Highly consistent
+≈ 11 εmach
+
+Gauge invariance
+
+A basic check is functional invariance under the head-wise symmetry of Section 2. We apply
+controlled transforms from Gmax to MHA layers (h=12, dk =dv =64), including random head
+permutations and well-conditioned Q/K and V /O changes of basis generated by thin–QR
+with prescribed singular values; outputs are compared on fixed inputs.
+As a control, transformations outside Gmax (e.g., cross–head mixing) induce O(1) changes,
+consistent with maximality. The same precision holds after 1,000 gradient steps on a reconstruction objective.
+7.2
+
+Gauge–aware gradient split (Euclidean proxy)
+
+The bundle theory (Lemma 3.1, Theorem 3.2) predicts horizontally aligned gradients in
+Fisher geometry. We test the proxy claim by replacing the Fisher inner product in Algorithm 1 with dot products: stack vertical generators into A and solve (A⊤ A)c = A⊤ ∇L.
+(Euc)
+On 50 independent samples, we report the Euclidean vertical fraction ∥PV
+∇L∥/∥∇L∥.
+
+353
+354
+355
+356
+357
+358
+359
+360
+361
+362
+363
+364
+
+Value
+
+Euclidean vertical fraction
+
+324
+
+1
+
+·10−3
+
+0.5
+
+0
+0
+
+10
+
+20
+
+30
+
+40
+
+50
+
+Sample index
+
+Figure 1: Gauge–aware split (Euclidean proxy). The Euclidean vertical fraction stays below a
+10−4 threshold across 50 samples, consistent with horizontality predicted by Theorem 3.2.
+
+The Figure 1 is uniform across layers and seeds: vertical fractions remain at numerical
+precision, and the horizontal component accounts for essentially all of the norm. This
+matches the Riesz characterization in Theorem 3.2—in practice, gradient steps align with
+the quotient geometry.
+The near-zero (Euclidean) vertical fractions indicate gradients lie almost entirely in functionchanging (horizontal) directions, consistent with Theorem 3.2 for gauge-invariant objectives.
+Note on scope. Angles between attention and FFN gradients are likewise reported with
+Euclidean inner products; they should be read as lower bounds on Fisher angles. FR–exact
+angle and holonomy measurements are enabled by Section 5 and left for future large-scale
+evaluation.
+
+8
+
+Architectural Variants and Limitations
+
+Real systems add positional structure and sharing patterns that slightly change the symmetry—and with it, the bundle—without altering the main thread of our results. We record
+the two common cases and then state the limits of our analysis in plain terms.
+7
+
+Under review as a conference paper at ICLR 2025
+
+378
+379
+380
+381
+382
+383
+384
+385
+386
+387
+388
+389
+390
+391
+392
+393
+394
+395
+
+Rotary position embeddings (RoPE). RoPE rotates Q/K channels in 2×2 planes
+determined by frequencies. On each plane the admissible head-wise transform collapses to
+the real commutant {aI +bJ} of that rotation, so the Q/K factor of Gmax reduces plane-wise.
+A useful way to remember the effect is dimensional: per head, the Q/K gauge dimension
+drops from d2k to dk , while the V /O factor stays at d2v . All statements in Sections 2–6 remain
+true after substituting this reduced group and restricting the generic stratum accordingly;
+the Fisher–Rao connection is defined exactly as before by gθ –orthogonality to the (now
+smaller) vertical space.
+Grouped and multi–query attention (GQA/MQA). When heads share key/value
+projections, the layer symmetry is no longer a direct product across individual heads but
+across groups that share parameters. Concretely, one replaces Gmax by a product over
+groups, with the shared GL(dk ) or GL(dv ) factor acting jointly on the grouped channels.
+The principal-bundle theorem and the free–proper argument are unchanged under this substitution, and the diagnostics of Section 5 apply verbatim once the vertical generator set
+respects the sharing pattern.
+
+402
+403
+404
+405
+406
+
+Limitations. Our claims are local and precise by design. They are proved on a
+Zariski–open regular stratum Θ0 where stabilizers are trivial; away from Θ0 the orbit
+type changes and the ambient space stratifies, so we avoid global topological statements
+(e.g., global connectivity of minima). The Fisher–Rao connection depends on the evaluation batch (standard in information geometry); consequently, numerical angles or vertical
+fractions are batch–specific. For scalability, the empirical section reports Euclidean proxies; these are consistent with the theory but do not constitute full Fisher–Rao validation.
+The Fisher–Rao–exact procedures are presented in Section 5 for future large-scale evaluation. We restrict to smooth activations (GeLU) so that the curvature expansion and
+Fisher calculus are well-defined; non-smooth activations such as ReLU require a stratified
+or Clarke–generalized treatment and fall outside our scope here. Finally, Fisher–Rao projectors and holonomy are costly at scale (they solve Gram systems and perform horizontal
+projections along loops); we therefore expose the methods and guarantees but do not add
+new measurements beyond the existing Euclidean computations.
+
+407
+408
+409
+410
+411
+412
+
+Takeaway. RoPE and GQA/MQA change the structure group in controlled
+ways—shrinking or tying Q/K symmetries—while the principal-bundle picture and the
+Fisher–Rao connection survive intact. The limitations above mark exactly where our guarantees apply and explain why we pair Euclidean–proxy measurements with Fisher–Rao–exact
+algorithms.
+
+396
+397
+398
+399
+400
+401
+
+413
+414
+415
+416
+417
+418
+419
+420
+421
+422
+423
+424
+425
+426
+427
+428
+429
+430
+431
+
+9
+
+Related Work
+
+Symmetries in neural networks. Permutation invariances in multilayer perceptrons
+have been recognized for decades Hecht-Nielsen (1990); Ainsworth et al. (2023); Entezari
+et al. (2022), and convolutional networks admit translation symmetries naturally modeled by
+group actions Cohen & Welling (2016). For Transformers, recent analyses have documented
+partial symmetries and superposition effects Henighan et al. (2023); Elhage et al. (2022), but
+a complete account of the maximal head–wise gauge and its consequences has been missing.
+Our work fills this gap by proving a principal-bundle structure on a generic stratum (see
+2.3) and developing a connection–curvature calculus on the quotient.
+Information geometry and optimization. Natural gradient methods Amari (1998);
+Amari & Nagaoka (2000); Amari (2016); Martens (2020) and their scalable approximations
+Pascanu & Bengio (2013); Ollivier (2015); Bernacchia & Pigolotti (2018) bring Riemannian
+structure to learning, typically as an algorithmic tool. Here the Fisher metric plays a
+different role: it selects a connection on the principal bundle, and the natural gradient is
+the Riesz representative restricted to the horizontal subspace (Theorem 3.2). Prior studies
+of Transformer optimization and loss geometry Liu et al. (2020); Zhang et al. (2020) report
+phenomena—flat directions, easy-to-traverse basins—that our quotient viewpoint explains
+
+8
+
+Under review as a conference paper at ICLR 2025
+
+432
+433
+434
+435
+436
+437
+438
+439
+440
+441
+442
+443
+444
+445
+446
+447
+448
+449
+450
+451
+452
+453
+454
+455
+456
+457
+458
+459
+460
+461
+462
+463
+464
+465
+466
+467
+468
+469
+470
+471
+472
+473
+474
+475
+476
+477
+478
+479
+480
+481
+482
+483
+
+cleanly: gauge orbits give Morse–Bott critical manifolds on Θ0 , while the induced loss on
+the base is Morse (Theorem 6.1).
+Interpretability and model merging. Mechanistic interpretability proceeds by reverse
+engineering circuits and features Olsson et al. (2022); Nanda et al. (2023). The bundle
+picture complements that line of work: fibers formalize “functionally the same” models,
+while horizontal directions capture genuine functional change. Practical procedures like
+canonicalization and model merging Ainsworth et al. (2023); Singh & Jaggi (2020) then
+acquire a geometric reading—deterministic gauge-fixes become sections of the bundle rather
+than ad hoc normal forms (cf. 5).
+Curvature, holonomy, and representation transport. Curvature has entered machine learning through Hessian structure and flatness surrogates Martens & Grosse (2015);
+Chaudhari et al. (2017); He & colleagues (2020). Holonomy and parallel transport are less
+common but natural in sequence models where order matters. We formalize attention as an
+Ehresmann connection on a representation bundle and show that curvature is generically
+nonzero (Theorem 4.1); a small-loop expansion relates curvature to a measurable holonomy
+(Theorem 5.1). For background, see Kobayashi & Nomizu (1963); Lee (2013).
+Remark 9.1 (Architectural variants and gauge structure). Architectural choices adjust the
+structure group in predictable ways. Rotary position embeddings (RoPE) Su et al. (2024)
+impose position-dependent rotations after linear projections, constraining any A ∈ GL(dk )
+to commute with the rotation blocks; for standard 2 × 2 planes, this reduces the query–key
+factor to the commutant CRoPE ∼
+= (GL(1, C))dk /2 (Proposition A.6). Multi-query attention
+Shazeer (2019) couples heads by sharing key–value projections, shrinking the gauge degrees of
+freedom from h(d2k +d2v ) to h · d2k + d2v while maintaining expressivity. Both variants preserve
+the principal-bundle perspective on the appropriate generic stratum; see 8.
+Position in the literature. Most geometric treatments fix a parameterization and study
+its local properties, or impose a data-dependent canonical form before analysis. We take the
+opposite route: start from the maximal head–wise gauge, prove a principal-bundle structure,
+and use the empirical Fisher metric to define a connection. This yields a horizontal/vertical calculus that explains optimization behavior (Theorem 3.2), clarifies architectural roles
+(attention curvature vs. near-vertical FFN flows; Theorem 4.1, Proposition 4.2), and supplies operational diagnostics (Algorithm 1, Algorithm 2)—all within a single, coordinate-free
+framework.
+
+10
+
+Conclusion
+
+We presented a coordinate–free account of Transformer geometry built on a maximal
+head–wise gauge and a principal–bundle structure on a generic stratum. Equipped with
+the empirical Fisher metric, this yields a Fisher–Rao connection, a clean horizontal/vertical
+calculus, and a precise statement that the natural gradient is the horizontal Riesz representative (3.2). On the representation side, attention induces a connection with generically
+nonzero curvature (4.1), while FFN behaves as a nearly fiber–preserving flow (Proposition 4.2). These ingredients lead to practical diagnostics—gauge–aware gradient splitting
+and a small–loop holonomy estimator (Algorithm 1, Algorithm 2, 5.1)—and a Morse–Bott
+view that explains why apparent “mode” gaps in parameter space collapse on the quotient
+(6.1).
+Our analysis is intentionally narrow and precise: it is local to the generic stratum, metric–dependent through the empirical Fisher, and focused on GeLU for smoothness. Within
+that scope, the principal–bundle picture clarifies optimization behavior, gives a geometric
+meaning to the attention/FFN split, and turns context sensitivity into a quantity that can
+be measured. We hope this framework serves as a durable foundation for geometry–aware
+analysis and tooling in Transformers.
+
+484
+485
+
+9
+
+Under review as a conference paper at ICLR 2025
+
+486
+487
+488
+489
+490
+491
+492
+493
+494
+495
+496
+497
+498
+499
+500
+501
+502
+503
+504
+505
+506
+507
+508
+509
+510
+511
+512
+513
+514
+515
+516
+517
+518
+519
+520
+
+References
+Samuel K Ainsworth, Jonathan Hayase, and Siddhartha Srinivasa. Git re-basin: Merging models modulo permutation symmetries. In International Conference on Learning
+Representations, 2023.
+Shun-ichi Amari. Natural gradient works efficiently in learning. Neural Computation, 10(2):
+251–276, 1998. doi: 10.1162/089976698300017746.
+Shun-ichi Amari. Information Geometry and its Applications, volume 194. Springer, 2016.
+Shun-ichi Amari and Shigeru Nagaoka. Methods of Information Geometry, volume 191 of
+Translations of Mathematical Monographs. American Mathematical Society and Oxford
+University Press, Providence, RI, 2000. ISBN 978-0-8218-0531-2.
+Alberto Bernacchia and Simone Pigolotti. Exact fisher information for the natural gradient
+in deep networks. arXiv preprint arXiv:1812.08211, 2018. URL https://arxiv.org/
+abs/1812.08211.
+Pratik Chaudhari, Anna Choromanska, Stefano Soatto, Yann LeCun, Carlo Baldassi, Christian Borgs, Jennifer Chayes, Riccardo Zecchina, and Ameet Talwalkar. Entropy-SGD:
+Biasing gradient descent into wide valleys. In 5th International Conference on Learning
+Representations, ICLR, 2017. URL https://arxiv.org/abs/1611.01838.
+Taco S Cohen and Max Welling. Group equivariant convolutional networks. In International
+Conference on Machine Learning, pp. 2990–2999. PMLR, 2016.
+Nelson Elhage, Tristan Hume, Catherine Olsson, Nicholas Schiefer, Tom Henighan, Shauna
+Kravec, Zac Hatfield-Dodds, Robert Lasenby, Dawn Drain, Carol Chen, et al. Toy models
+of superposition. Transformer Circuits Thread, 2022.
+Rahim Entezari, Hanie Sedghi, Olga Saukh, and Behnam Neyshabur. The role of permutation invariance in linear mode connectivity of neural networks. In International
+Conference on Learning Representations, 2022.
+Y. He and colleagues. Curvature and optimization in deep learning. arXiv preprint
+arXiv:2005.00000, 2020. General reference on curvature analyses in deep networks.
+Robert Hecht-Nielsen. On the algebraic structure of feedforward network weight spaces.
+Advanced Neural Computers, pp. 129–135, 1990.
+
+521
+522
+523
+524
+525
+526
+
+Tom Henighan, Jared Kaplan, Mor Katz, Mark Chen, Christopher Hesse, Jacob Jackson,
+Heewoo Jun, Tom B Brown, Prafulla Dhariwal, Scott Gray, et al. Superposition, memorization, and double descent. arXiv preprint arXiv:2301.05101, 2023.
+
+527
+528
+529
+530
+531
+532
+
+John M. Lee. Introduction to Smooth Manifolds, volume 218 of Graduate Texts in
+Mathematics. Springer, New York, 2 edition, 2013. ISBN 978-1441999826. doi:
+10.1007/978-1-4419-9982-5.
+
+533
+534
+535
+536
+537
+538
+539
+
+Shoshichi Kobayashi and Katsumi Nomizu. Foundations of Differential Geometry, Vol. I.
+Interscience Publishers, New York, 1963. ISBN 978-0471472503.
+
+Liyuan Liu, Xiaodong Liu, Jianfeng Gao, Weizhu Chen, and Jiawei Han. Understanding the
+difficulty of training transformers. In Proceedings of the 2020 Conference on Empirical
+Methods in Natural Language Processing, pp. 5747–5763, 2020.
+James Martens. New insights and perspectives on the natural gradient method. Journal of
+Machine Learning Research, 21(146):1–76, 2020. URL http://jmlr.org/papers/v21/
+20-441.html.
+James Martens and Roger Grosse. Optimizing neural networks with kronecker-factored
+approximate curvature. In Proceedings of the 32nd International Conference on Machine
+Learning, ICML, pp. 2408–2417, 2015.
+
+10
+
+Under review as a conference paper at ICLR 2025
+
+540
+541
+542
+543
+544
+545
+
+Neel Nanda, Lawrence Chan, Tom Lieberum, Jess Smith, and Jacob Steinhardt. Progress
+measures for grokking via mechanistic interpretability. arXiv preprint arXiv:2301.05217,
+2023.
+Yann Ollivier. Riemannian metrics for neural networks i: Feedforward networks. arXiv
+preprint arXiv:1506.06400, 2015. URL https://arxiv.org/abs/1506.06400.
+
+546
+547
+548
+549
+550
+551
+
+Catherine Olsson, Nelson Elhage, Neel Nanda, Nicholas Joseph, Nova DasSarma, Tom
+Henighan, Ben Mann, Amanda Askell, Yuntao Bai, Anna Chen, et al. In-context learning
+and induction heads. Transformer Circuits Thread, 2022.
+
+552
+553
+554
+555
+556
+557
+
+Noam Shazeer. Fast transformer decoding: One write-head is all you need. arXiv preprint
+arXiv:1911.02150, 2019.
+
+558
+559
+560
+561
+562
+563
+564
+565
+566
+567
+568
+569
+570
+571
+572
+573
+574
+
+Razvan Pascanu and Yoshua Bengio. Revisiting natural gradient for deep networks. arXiv
+preprint arXiv:1312.6184, 2013. URL https://arxiv.org/abs/1312.6184.
+
+Sidak Pal Singh and Martin Jaggi. Model fusion via optimal transport. In Advances in
+Neural Information Processing Systems, volume 33, pp. 22045–22055, 2020.
+Jianlin Su, Yu Lu, Shengfeng Pan, Ahmed Murtadha, Bo Wen, and Yunfeng Liu. Roformer:
+Enhanced transformer with rotary position embedding. Neurocomputing, 568:127063,
+2024.
+Biao Zhang, Ivan Titov, and Rico Sennrich. Adaptive attention span in transformers. In
+Proceedings of the 58th Annual Meeting of the Association for Computational Linguistics,
+pp. 331–335, 2020.
+
+Ethics Statement
+This work studies internal symmetries and geometric structure of standard Transformer
+blocks. Experiments use synthetic inputs and publicly available checkpoints; no personal
+or sensitive data are involved, and no user-facing deployment is performed. All diagnostics
+(e.g., gauge-aware gradient decomposition and small-loop holonomy procedures) are offline
+analyses intended to clarify invariances, optimization geometry, and representation transport. Environmental impact is limited to training-free evaluations and lightweight gradient
+computations; we report implementation details in the Reproducibility Statement.
+
+575
+576
+577
+578
+579
+580
+
+Reproducibility Statement
+
+581
+582
+583
+584
+585
+586
+
+A
+
+587
+588
+589
+590
+591
+
+We provide algorithmic details for our diagnostics in 5 and full procedural notes in F and B.
+Table 2 reports gauge-invariance verification, and Figure 1 reports Euclidean-proxy vertical
+fractions for gradient decomposition.
+
+Group Action, Maximal Gauge, and the Principal Bundle
+
+Setup.
+
+Recall the head-wise action of
+Gmax =
+
+
+(GL(dk ))h × (GL(dv ))h ⋊ Sh
+
+on parameters by
+
+(i)
+(i)
+(i)
+(i)
+,
+(WQ , WK ) 7→ WQ Ai , WK A−⊤
+i
+
+
+(i)
+(i)
+(WV , WO ) 7→ WV Ci , Ci−1 WO ,
+
+together with head permutations, restricted to the generic stratum Θ0 of Definition 2.1.
+
+592
+593
+
+11
+
+Under review as a conference paper at ICLR 2025
+
+594
+595
+596
+597
+598
+599
+600
+601
+602
+603
+604
+605
+606
+607
+608
+609
+610
+611
+612
+613
+614
+615
+616
+617
+618
+619
+620
+621
+622
+623
+624
+625
+626
+627
+628
+629
+630
+631
+632
+633
+634
+635
+636
+637
+638
+639
+640
+641
+642
+643
+644
+645
+
+A.1
+
+Maximal Gauge Group: Full Proofs
+
+Lemma A.1 (Sufficiency: sector-wise invariances). For any Ai ∈ GL(dk ) and Ci ∈ GL(dv ),
+(i)
+
+(i)
+
+(i)
+
+(i)
+
+(WQ , WK ) 7→ (WQ Ai , WK A−⊤
+i ),
+
+(i)
+
+(i)
+
+(WV , WO,i ) 7→ (WV Ci , Ci−1 WO,i )
+
+preserve Qi Ki⊤ and Vi WO,i , hence the layer output; permutations σ ∈ Sh also preserve it.
+′
+= Vi WO,i for all inputs.
+Proof. Direct calculation shows Q′i (Ki′ )⊤ = Qi Ki⊤ and Vi′ WO,i
+
+Lemma A.2 (Attention-weight identifiability up to permutation). If two parameter sets
+realize the same attention layer for all inputs, then attention weights are preserved up to a
+fixed head permutation σ ∈ Sh .
+Proof. Use head-isolating inputs guaranteed by (G3) and controllability (dmodel ≥ 2dk ):
+construct X (i) with αi (X (i) ) ≈ I and αj (X (i) ) ≈ 0 for j ̸= i. Equality of outputs forces a
+bijection between heads, hence a permutation.
+Lemma A.3 (Lie algebra of infinitesimal symmetries). The Lie algebra is
+gmax =
+
+h
+M
+
+gl(dk ) ⊕
+
+i=1
+(i)
+
+(i)
+
+h
+M
+
+gl(dv ),
+
+i=1
+
+(i)
+
+(i)
+
+(i)
+
+(i)
+
+with generators δWQ = WQ Xi , δWK = −WK Xi⊤ , δWV = WV Yi , δWO,i = −Yi WO,i .
+Proof. Differentiate the invariance identities of Lemma A.1 along a smooth one-parameter
+subgroup.
+Lemma A.4 (No cross-head mixing beyond permutations). Any linear map on the concatenated value space that preserves the layer for all inputs must be block-diagonal up to a
+permutation; i.e., heads cannot be mixed except by σ ∈ Sh .
+Proof. Apply Lemma A.2 to isolate heads, then use linear independence of the WO block
+rows (under dmodel = h dv and genericity) to force off-diagonal blocks to vanish.
+Theorem A.5 (Maximality). On Θ0 , the full symmetry group equals Gmax and no additional continuous or discrete symmetries exist.
+Proof. By Lemma A.1, Gmax preserves the function. Conversely, Lemma
+A.2 gives
+Q
+Q the permutation part; Lemma A.3 pins down the connected component as i GL(dk ) × i GL(dv );
+Lemma A.4 excludes cross-head mixing beyond Sh . Hence every symmetry lies in Gmax .
+Head sharing (GQA/MQA). When keys/values are tied into g groups, the same argument forces Ai and Ci to tie per group, yielding a continuous symmetry (GL(dk ))g ×
+(GL(dv ))g with permutations Sh × Sg .
+RoPE commutant and dimension drop. On each
+ 2×2
+ RoPE plane with rotation R(ϕ),
+commuting with all R(ϕ) forces A = aI + bJ (J = 01 −1
+0 ). Across dk /2 planes this yields
+CRoPE ∼
+= GL(1, C)dk /2 , with real dimension dk per head; the V /O factor remains d2v .
+Proposition A.6 (RoPE commutant reduction and dimension). With rotary position embeddings (even dk ), each 2×2 rotation plane restricts admissible Q/K transforms to the real
+commutant {aI +bJ} on that plane. Equivalently, the Q/K factor reduces to a block-diagonal
+commutant subgroup (canonically (GL(1, C))dk /2 ), so the per-head Q/K gauge dimension
+drops from d2k to dk . The V /O factor remains d2v .
+
+646
+647
+
+12
+
+Under review as a conference paper at ICLR 2025
+
+648
+649
+650
+651
+652
+653
+654
+655
+656
+657
+658
+659
+660
+661
+662
+663
+664
+665
+666
+667
+668
+669
+670
+671
+672
+673
+674
+675
+676
+677
+678
+679
+680
+681
+682
+683
+684
+685
+686
+687
+688
+689
+690
+691
+692
+693
+694
+695
+696
+697
+698
+699
+700
+701
+
+A.2
+
+Free and Proper Action; Principal Bundle
+
+Lemma A.7 (Trivial stabilizers on Θ0 ). If θ ∈ Θ0 and g ∈ Gmax satisfy g · θ = θ, then
+g = e.
+Proof. Write g = ((Ai )hi=1 , (Ci )hi=1 , σ). By definition of the action,
+(i)
+
+(σ(i))
+
+WQ Ai = WQ
+
+(i)
+
+(σ(i))
+
+WK A−⊤
+= WK
+i
+
+,
+
+(i)
+
+,
+
+(σ(i))
+
+WV Ci = WV
+(i)
+
+(i)
+
+,
+
+Ci−1 WO = WO on the i-th block rows.
+
+(i)
+
+On Θ0 , (G1) gives full column rank for each WQ , WK , WV and full row rank dv for the
+i-th block-row selector Si WO . First, Ci−1 WO = WO on rows of head i implies (Si WO ) =
+(Si Ci−1 WO ) = (Si Ci−1 Si⊤ )(Si WO ) so, since Si WO has rank dv , we get Si Ci−1 Si⊤ = Idv and
+(i)
+(σ(i))
+(i)
+(σ(i))
+hence Ci = I. Then WV Ci = WV
+reduces to WV = WV
+, so unless blocks coincide
+identically we must have σ(i) = i; on Θ0 distinct heads are nondegenerate and in general
+(i)
+(i)
+(i)
+(i)
+(i)
+(i)
+position, hence σ = id. Finally, from WQ Ai = WQ and WK A−⊤
+= WK with WQ , WK
+i
+1
+full column rank, we obtain Ai = I for each i. Thus g = e.
+Lemma A.8 (Properness on the regular stratum). The Gmax –action on Θ0 is proper.
+Proof (sequential/closed–graph characterization). Let θn → θ ∈ Θ0 and gn · θn → θ′ with
+(n)
+(n)
+gn = ((Ai )i , (Ci )i , σn ). Since Sh is finite, pass to a subsequence with σn ≡ σ. We show
+{gn } is bounded in Gmax and hence has a convergent subsequence in the (closed) matrix
+group.
+Uniform left/right inverses from genericity. Because θ ∈ Θ0 and θn → θ, there exists a
+neighborhood U of θ and positive constants
+αQ , αK , αV , αO > 0
+such that for all ϑ ∈ U and all heads i: (i) the smallest singular values satisfy
+(i)
+(i)
+(i)
+σmin (WQ (ϑ)) ≥ αQ , σmin (WK (ϑ)) ≥ αK , σmin (WV (ϑ)) ≥ αV ; and (ii) the block-row
+map Si WO (ϑ) has full row rank dv with σmin (Si WO (ϑ)) ≥ αO . Hence there exist uniformly bounded left inverses LQ,i (ϑ), LK,i (ϑ), LV,i (ϑ) and right/left inverses for Si WO (ϑ)
+−1
+−1
+−1
+with operator norms bounded by αQ
+, αK
+, αV−1 , αO
+respectively.
+(n)
+
+Boundedness of Ai
+
+(n)
+
+and (Ai )−1 . From the Q–equation at θn we have
+(i)
+
+(n)
+
+(σ(i))
+
+WQ (θn ) Ai
+
+= WQ
+
+(n)
+
+(n)
+
+EQ,i → 0
+
+(θn ) + EQ,i ,
+
+because gn · θn → θ′ and all maps are continuous. Left–multiplying by LQ,i (θn ) yields
+(n)
+
+Ai
+
+(σ(i))
+
+= LQ,i (θn ) WQ
+
+(n)
+
+(θn ) + LQ,i (θn ) EQ,i ,
+
+(n)
+
+(σ(i))
+
+−1
+so {Ai }n is bounded (uniform bound from ∥LQ,i ∥ ≤ αQ
+and boundedness of WQ
+Similarly, from the K–equation
+(i)
+
+(n),−⊤
+
+WK (θn ) Ai
+
+(σ(i))
+
+= WK
+
+(n)
+
+(n)
+
+EK,i → 0,
+
+(θn ) + EK,i ,
+
+(n),−⊤
+
+left–multiply by LK,i (θn ) to obtain a uniform bound on Ai
+(n)
+
+Boundedness of Ci
+
+(θn )).
+
+(n)
+
+and thus on (Ai )−1 .
+
+(n)
+
+and (Ci )−1 . From
+(i)
+
+(n)
+
+WV (θn ) Ci
+
+(σ(i))
+
+= WV
+
+(n)
+
+(θn ) + EV,i ,
+
+(n)
+
+EV,i → 0,
+(n)
+
+left–multiplying by LV,i (θn ) gives a uniform bound on Ci . For the inverse, use the
+O–equation on the i–th block rows:
+(n),−1
+
+Ci
+
+(n)
+
+Si WO (θn ) = Si WO (θn ) + EO,i ,
+
+(n)
+
+EO,i → 0.
+
+1
+If RoPE is enabled, Ai is further constrained to the real commutant on each 2 × 2 plane; the
+same argument forces Ai = I within that commutant.
+
+13
+
+Under review as a conference paper at ICLR 2025
+
+702
+703
+704
+705
+706
+707
+708
+709
+710
+711
+712
+713
+714
+715
+716
+717
+718
+719
+720
+721
+722
+723
+724
+725
+726
+727
+728
+729
+730
+731
+732
+733
+734
+735
+736
+737
+738
+739
+740
+741
+742
+743
+744
+745
+746
+747
+748
+749
+750
+751
+752
+753
+754
+755
+
+Right–multiply by a uniformly bounded right inverse of Si WO (θn ) (or, equivalently,
+(n),−1
+left–multiply by the bounded left inverse of (Si WO (θn ))⊤ ) to get a uniform bound on Ci
+.
+(n)
+
+(n)
+
+(n)
+
+(n)
+
+Therefore, for each head i, the sets {Ai }n , {(Ai )−1 }n , {Ci }n , {(Ci )−1 }n are bounded.
+Together with σn ≡ σ, this implies {gn } is bounded in Gmax and hence admits a convergent
+subsequence in the (closed) Lie group. This is equivalent to properness of the action map
+on Θ0 .
+Remark A.9 (RoPE restriction). If RoPE is enabled, each Ai lies in the real commutant
+on every 2×2 rotation plane. The arguments above apply plane–wise with the same uniform
+singular–value bounds (now on the compressed blocks), so the boundedness and convergence
+conclusions remain valid.
+Theorem A.10 (Principal-bundle structure, restated). Under Lemmas A.7 and A.8, the
+Gmax –action on Θ0 is free and proper. Therefore
+π : Θ0 −→ Q := Θ0 /Gmax
+is a principal Gmax –bundle, and the fibers are gauge orbits.
+Proof. A free, proper Lie–group action admits local slices and hence local trivializations,
+yielding a principal bundle.
+
+B
+
+Fisher–Rao Connection and Natural Gradient
+
+This appendix spells out the Fisher–Rao (FR) geometry behind Section 3 in a coordinatefree way and then gives the compact coordinate formula used in the main text. Throughout,
+gθ is the empirical Fisher metric on Θ0 (defined on a fixed evaluation batch), and
+Tθ Θ0 = Vθ ⊕ Hθ
+is its gθ –orthogonal split into vertical (gauge) and horizontal (function-changing) directions.
+Riesz map and horizontality. Let Rθ : Tθ Θ0 → Tθ∗ Θ0 be the Riesz isomorphism determined by gθ , i.e. ⟨Rθ (u), w⟩ = gθ (u, w) for all u, w. If L is gauge-invariant, the differential
+kills vertical vectors and therefore lives entirely on the horizontal dual.
+Lemma B.1 (Gauge-null differential). If L is gauge-invariant, then dLθ [v] = 0 for all
+v ∈ Vθ . Equivalently, R−1
+θ (dLθ ) ∈ Hθ .
+Proof. For any Lie-algebra element X, the curve t 7→ exp(tX)·θ stays in the fiber and L is
+d
+constant along it, so dt
+L(exp(tX)·θ) = 0. The fundamental vector field ρθ (X) spans
+t=0
+Vθ , which gives the claim.
+Natural gradient as a Riesz representative.
+θ is defined intrinsically by
+e w) = ⟨∇L, w⟩
+gθ (∇L,
+
+The natural (Riemannian) gradient at
+
+for all w ∈ Tθ Θ0 .
+
+e to be horizontal; the next theorem packages this as an exact Riesz
+Lemma B.1 forces ∇L
+statement and a variational principle.
+Theorem B.2 (Natural gradient as horizontal Riesz representative). There is a unique
+e ∈ Hθ such that gθ (∇L,
+e w) = ⟨∇L, w⟩ for all w ∈ Tθ Θ0 . Equivalently,
+vector ∇L
+
+e = R−1 dLθ ,
+∇L
+θ|Hθ
+and, in any local chart where Gθ is the matrix of gθ and PHθ is the Euclidean projector onto
+Hθ ,
+⊤
+e = (Gθ|H )† PH
+∇L
+∇L.
+θ
+θ
+e
+Moreover, ∇L is the unique minimizer of the strictly convex functional
+u 7→ 12 gθ (u, u) − ⟨∇L, u⟩
+14
+
+over u ∈ Hθ .
+
+Under review as a conference paper at ICLR 2025
+
+756
+757
+758
+759
+760
+761
+762
+763
+764
+765
+766
+767
+768
+769
+770
+771
+772
+773
+774
+775
+776
+777
+778
+779
+780
+781
+782
+783
+784
+785
+786
+787
+788
+789
+790
+791
+792
+793
+794
+795
+796
+797
+798
+799
+800
+801
+802
+803
+804
+805
+806
+807
+808
+809
+
+Proof. By Lemma B.1, dLθ ∈ Hθ∗ , and the restriction Rθ|Hθ : Hθ → Hθ∗ is an isomorphism.
+The coordinate expression follows by identifying Rθ|Hθ with Gθ|Hθ and restricting the Eu⊤
+clidean adjoint via PH
+. The variational statement is the standard Riesz minimization on a
+θ
+Hilbert space.
+Corollary B.3 (When “projection” is correct). If the Fisher matrix restricted to Hθ is the
+e = P⊤ ∇L. In general, identifying the
+identity in the chosen chart, Gθ|Hθ = I, then ∇L
+Hθ
+natural gradient with an orthogonal projection is incorrect unless this special case holds.
+Projectors and a practical decomposition. Given vertical generators {vj }m
+j=1 at θ,
+the FR-orthogonal vertical component of u is obtained from the Gram system
+m
+X
+Gij = gθ (vi , vj ),
+bi = gθ (vi , u),
+Gc = b,
+uvert =
+c j vj ,
+uhor = u − uvert .
+j=1
+
+This is Algorithm 1 in Section 5. In practice we allow a small Tikhonov term (G + λI) for
+numerical stability. The Euclidean proxy replaces gθ by dot products (stack the generators
+into A and solve (A⊤ A)c = A⊤ u); it does not change the definition of uvert in FR geometry
+and is used only for scalable measurement in Section 7.
+Batch dependence. The empirical Fisher depends on the evaluation batch; all FR statements here and in Section 3 are made relative to a fixed batch. This affects numerical values
+(angles, fractions) but not the structural results above.
+
+C
+
+Attention as Connection; Curvature and Holonomy
+
+We pass from the parameter bundle to the representation side. Fix a layer and let R denote
+the representation bundle whose fiber over an input sequence is the token feature space (with
+heads acting in parallel). The attention update provides horizontal lifts of base variations
+(data directions), hence an Ehresmann connection on R. We write Ω for its curvature
+two–form and use the Fisher–Rao horizontal/vertical split from Section 3.
+Induced connection and explicit sensitivities. Let Y
+= Attn(X; θ) =
+Ph
+√1 QK ⊤ . For a horizontal direction
+α
+(X;
+θ)
+V
+(X;
+θ)
+with
+α
+=
+softmax(Z)
+and
+Z
+=
+i
+i
+i=1
+dk
+w ∈ Hθ ,
+X
+X
+Dw Y =
+(Dw αi ) Vi +
+αi Dw Vi ,
+Dw α = Jsm (Z) vec(Dw Z),
+(C.1)
+i
+
+i
+
+where Jsm (Z) = Diag(α) − α α⊤ is the softmax Jacobian (blockwise across query positions)
+and
+
+
+Dw Z = √1d (Dw Q)K ⊤ + Q(Dw K)⊤ .
+(C.2)
+k
+
+The horizontal lift Xw is the vector field on R defined by Xw ·Y := Dw Y .
+Theorem C.1 (Attention curvature is generically nonzero). On a Zariski–open (hence
+full–measure) subset of Θ0 , the curvature two–form Ω of the induced connection on R is
+nonzero. In particular, if there exist horizontal directions u, v ∈ Hθ such that the weight
+sensitivities Du α and Dv α are not collinear and the set {Vi } is not jointly degenerate along
+both u and v, then Ωθ (u, v) ̸= 0.
+Proof. Compute the commutator of horizontal lifts on Y :
+[Xu , Xv ]·Y = Du Dv Y − Dv Du Y.
+Using equation C.1 twice and the product rule,
+X
+X
+X
+X
+Du Dv Y =
+(Du Dv αi ) Vi +
+(Dv αi ) Du Vi +
+(Du αi ) Dv Vi +
+αi Du Dv Vi ,
+Dv Du Y =
+
+i
+
+i
+
+X
+
+X
+
+i
+
+(Dv Du αi ) Vi +
+
+i
+
+i
+
+X
+X
+(Du αi ) Dv Vi +
+(Dv αi ) Du Vi +
+αi Dv Du Vi .
+
+i
+
+i
+
+15
+
+i
+
+Under review as a conference paper at ICLR 2025
+
+810
+811
+812
+813
+814
+815
+816
+817
+818
+819
+820
+821
+822
+823
+824
+825
+826
+827
+828
+829
+830
+831
+832
+833
+834
+835
+836
+837
+838
+
+Subtracting gives cancellation of the mixed first–order products and second–order V terms,
+leaving
+X
+
+[Xu , Xv ]·Y =
+Du Dv αi − Dv Du αi Vi .
+(C.3)
+i
+
+Thus the commutator is driven by the non–commutativity of the weight variations. By
+equation C.2,
+
+
+Dw α = Jsm (Z) vec √1d (Dw Q)K ⊤ + Q(Dw K)⊤ .
+k
+
+Unless Du α and Dv α are collinear and the {Vi } conspire to cancel in equation C.3, the
+commutator is nonzero. Since the exceptional set where these algebraic equalities hold is
+contained in a proper algebraic subset of Θ0 , nonvanishing is generic. By the definition of the
+induced connection, the vertical component of [Xu , Xv ] equals Ωθ (u, v), hence Ωθ (u, v) ̸= 0
+generically.
+Explicit BCH for horizontal loops. Let u, v ∈ Hθ be gθ –orthonormal and Φεw the
+horizontal flow along w for time ε. Consider the small horizontal loop
+□ε (u, v) = Φεv ◦ Φεu ◦ Φ−εv ◦ Φ−εu .
+Write Xu , Xv for the horizontal vector fields. Using the Baker–Campbell–Hausdorff (BCH)
+expansion for commutators of flows,
+
+
+
+3
+□ε (u, v) = exp ε2 [Xv , Xu ] + ε2 [Xu , [Xu , Xv ]] + [Xv , [Xv , Xu ]] + O(ε4 ) ,
+(C.4)
+as operators on sections of R. Projecting to the vertical component and using [Xu , Xv ]vert =
+Ωθ (u, v) yields the second–order holonomy law with an explicit third–order correction:
+Proposition C.2 (BCH expansion and vertical projection). In Lie–algebra coordinates for
+the structure group,
+
+
+3
+∆□ε (u, v) = ε2 Ωθ (u, v) + ε2 [Xu , [Xu , Xv ]]vert + [Xv , [Xv , Xu ]]vert + O(ε4 ).
+
+839
+840
+841
+842
+843
+844
+
+Consequently, ∥∆□ε (u, v)∥ = ε2 ∥Ωθ (u, v)∥ + O(ε3 ) for any norm smoothly equivalent to the
+operator norm.
+
+845
+846
+847
+848
+849
+850
+
+Holonomy scaling and Richardson bias removal. Define H(ε) = ∥∆□ε (u, v)∥/ε2 .
+From Proposition C.2, H(ε) = ∥Ωθ (u, v)∥ + c ε + O(ε2 ) for some smooth c = c(θ, u, v). The
+standard Richardson extrapolate
+
+851
+852
+853
+854
+855
+856
+857
+858
+859
+860
+861
+862
+863
+
+Proof. Apply equation C.4 and take the vertical projection; norms of the multilinear remainder are controlled by smoothness of Xu , Xv on Θ0 .
+
+H⋆ =
+
+4H(ε/2) − H(ε)
+3
+
+cancels the linear term and satisfies H ⋆ = ∥Ωθ (u, v)∥ + O(ε2 ).
+Implementation note. The gauge displacement ∆□ε (u, v) is obtained by least–squares
+alignment onto a vertical generator basis (the same used in the gauge–aware projector),
+followed by a local logarithm in the structure group. This matches Algorithm 2 and underlies
+Theorem 5.1.
+
+D
+
+FFN Near-Verticality and Attention–FFN Separation
+
+We quantify the informal picture from Section 4: the position–wise feed–forward block
+(FFN) acts almost entirely along fibers, while attention mixes across tokens and bends horizontal directions. Throughout we assume GeLU smoothness and the same fixed evaluation
+batch used to define the Fisher–Rao (FR) metric.
+
+16
+
+Under review as a conference paper at ICLR 2025
+
+864
+865
+866
+867
+868
+869
+870
+871
+872
+873
+874
+875
+876
+877
+878
+879
+880
+881
+882
+883
+884
+885
+886
+887
+888
+889
+890
+891
+892
+893
+894
+895
+896
+897
+898
+899
+900
+901
+902
+903
+904
+905
+906
+907
+908
+909
+910
+911
+912
+913
+914
+915
+916
+917
+
+Structure of the FFN Jacobian. Let FFN(X; θ) = W2 ϕ(W1 X + b1 ) + b2 act tokenwise,
+with ϕ = GeLU. The Jacobian with respect to parameters decomposes as
+T h
+i
+M
+Dθ FFN(X; θ) =
+(ϕ′ (W1 xt + b1 ) ⊙ W2⊤ ) Dθ W1 + Dθ W2 ϕ(W1 xt + b1 ) + Dθ b• ,
+t=1
+
+a block–diagonal sum over tokens t. After composing with the value/output readout in
+MHA, the dominant directions created by these blocks coincide, up to small residuals controlled by ϕ′ , with the vertical generators associated with head–wise V /O transformations.
+Lemma D.1 (Block–diagonal FFN and the vertical span). Under the FR metric, the image
+of Dθ FFN lies in the closure of the span of vertical generators {vj } associated with head–wise
+V /O transformations, up to a remainder whose FR norm is controlled by the GeLU slope
+statistics on the evaluation batch:
+√
+
+1/2
+dhead
+′
+2
+PHθ ∇FFN g ≤ E[∥ϕ (W1 X + b1 )∥ ]
+· κLN · √
+∇FFN g ,
+θ
+θ
+dmodel
+where κLN captures the (bounded) contribution of normalization layers and residual scalings.
+Proof. Since Dθ FFN is block–diagonal across tokens, its contribution to dπ cannot mix token indices. The vertical generator family corresponding to V /O changes spans precisely
+the directions that adjust head–wise value subspaces while compensating in WO . Projecting
+Dθ FFN onto this span leaves a remainder driven by the tokenwise slope ϕ′ and normalization/residual gates; Jensen–Cauchy–Schwarz controls its FR norm. The dimensional factor
+comes from comparing the head subspace to the model space under dmodel = h dv .
+Proposition D.2 (FFN near–verticality and Fisher angle bound). With the FR inner
+product,
+r
+r
+PHθ ∇FFN g
+
+dhead
+dhead
+θ
+cos ∠gθ ∇FFN , ∇Att ≤ C
+≤ C
+,
+,
+dmodel
+dmodel
+∇FFN g
+θ
+
+where C depends smoothly on GeLU slope statistics and normalization constants on the
+evaluation batch.
+Proof. Decompose both gradients into head–wise components and apply Cauchy–Schwarz
+in the FR metric. Attention’s horizontal part lives in a subspace whose effective dimension
+scales with dmodel (token mixing), while Lemma D.1 places the FFN gradient near the
+vertical span generated by V /O (headwise) directions, with horizontal leakage controlled by
+the GeLU slope and normalization factors. The ratio of dimensions dhead /dmodel yields the
+stated square–root factor; the constant C collects bounded batch–dependent terms.
+Remarks. (i) The bounds are local to the fixed batch that defines gθ ; changing the batch
+perturbs C but not the scaling. (ii) Euclidean angles reported in Section 7 are conservative: they lower–bound Fisher angles and thus preserve the qualitative separation predicted
+here. (iii) The same argument applies layerwise; at model scale one sums the per–layer
+contributions, with residuals controlled by standard stability estimates.
+
+E
+
+Morse–Bott Structure and the Quotient Loss
+
+This section gives the proof of Theorem 6.1 from the main text.
+Proof of Theorem 6.1. Gauge–invariance gives dLθ [v] = 0 for every v ∈ Vθ (Lemma B.1),
+so the entire orbit Gmax · θ lies in the critical set and the Hessian ∇2 L(θ) annihilates Vθ .
+Since the Gmax –action on Θ0 is free and proper (Theorem 2.3), the slice theorem yields a
+submanifold S through θ with Tθ S = Hθ and a Gmax –equivariant diffeomorphism from a
+neighborhood of θ onto a neighborhood of the orbit modeled on Gmax × S. Restricting L
+to S freezes vertical directions, so the Hessian of L|S at θ equals the horizontal block of
+∇2 L(θ). The quotient map identifies S with a chart of Q around [θ]; because ℓ ◦ π = L,
+the Hessian ∇2 ℓ([θ]) matches the horizontal restriction of ∇2 L(θ). Nondegeneracy of the
+horizontal block is therefore equivalent to ℓ being Morse at [θ].
+17
+
+Under review as a conference paper at ICLR 2025
+
+918
+919
+920
+921
+922
+923
+924
+925
+926
+927
+928
+929
+930
+931
+932
+933
+934
+935
+936
+937
+938
+939
+940
+941
+942
+943
+944
+945
+946
+947
+948
+949
+950
+951
+952
+953
+954
+955
+956
+957
+958
+959
+960
+961
+962
+963
+964
+965
+966
+967
+968
+969
+
+Remarks. (i) The argument is local to the regular stratum Θ0 ; outside it, stabilizers may
+grow and the space stratifies. (ii) The identification of ∇2 ℓ([θ]) with the horizontal block is
+independent of the slice, since all slices share Tθ S = Hθ .
+
+F
+
+Algorithms and Reproducibility
+
+This appendix gives the concrete procedures behind Section 5 and the minimal choices
+needed to reproduce our figures. We keep the presentation compact; all routines are drop–in
+and numerically stable at the scales reported in Section 7.
+Vertical generators (respecting RoPE and sharing). We obtain a numerically independent spanning set of the vertical space Vθ by differentiating the Gmax –action. For
+X ∈ gl(dk ),
+
+(i)
+(i)
+(i)
+(i)
+(i)
+δQK (X) : (WQ , WK ) 7→ WQ X, −WK X ⊤ ,
+and for Y ∈ gl(dv ),
+
+(i)
+(i)
+(i)
+δV O (Y ) : (WV , WO ) 7→ WV Y, insert − Y in the ith dv –block of WO .
+Head permutations generate a discrete symmetry and do not contribute to Vθ . With RoPE
+(even dk ), we restrict X plane–wise to the commutant {aI + bJ} on each 2×2 rotation
+block; with GQA/MQA we tie the corresponding X or Y across shared heads. In practice
+we assemble candidates, vectorize, and perform thin–QR with column pivoting to remove
+near–collinear directions (tolerance 10−10 ), yielding a well–conditioned basis {vj }m
+j=1 .
+FR and Euclidean projectors (implementation). Given {vj } and a vector u (e.g.,
+u = ∇L), the FR–orthogonal decomposition solves the Gram system
+Gij = gθ (vi , vj ),
+
+bi = gθ (vi , u),
+
+(G + λI)c = b,
+
+with optional Tikhonov λ ∈ [10−10 , 10−6 ] for stability. We then set
+X
+uvert =
+c j vj ,
+uhor = u − uvert .
+j
+
+The Euclidean proxy replaces gθ by the dot product: stack A = [ vec(v1 ) · · · vec(vm ) ] and
+solve (A⊤ A + λI)c = A⊤ u. We report the vertical fraction ∥uvert ∥/∥u∥ and the residual
+∥Ac − u∥/∥u∥ (Euclidean) or ∥(G + λI)c − b∥/∥b∥ (FR) as fit diagnostics.
+Algorithm 3 Vertical/Horizontal Decomposition (FR and Euclidean)
+Require: basis {vj }m
+j=1 for Vθ ; vector u; metric handle inner(·, ·)
+1: Gij ← inner(vi , vj ), bi ← inner(vi , u)
+2: Solve (G + λI)c = b (Cholesky if well–conditioned, else CG with stopping on relative
+residual P
+10−10 )
+3: uvert ← j cj vj , uhor ← u − uvert
+4: return (uvert , uhor ), vertical fraction ∥uvert ∥/∥u∥, residual
+
+Holonomy estimator (procedure and bias control). For gθ –orthonormal u, v ∈ Hθ ,
+we traverse the small horizontal loop +εu → +εv → −εu → −εv, projecting to H at
+each leg with the FR projector above. The net effect is a vertical displacement represented
+in Lie–algebra coordinates by aligning the before/after states to the vertical basis (least
+squares). Denote H(ε) = ∥∆□ε (u, v)∥/ε2 .
+
+970
+971
+
+18
+
+Under review as a conference paper at ICLR 2025
+
+972
+973
+974
+975
+976
+977
+978
+979
+980
+981
+982
+983
+984
+985
+986
+987
+988
+989
+990
+991
+992
+993
+994
+995
+996
+997
+998
+999
+1000
+
+Algorithm 4 Holonomy Estimator with Richardson Extrapolation
+Require: θ; orthonormal u, v ∈ Hθ ; steps ε > ε′ = ε/2
+1: for δ ∈ {ε, ε′ } do
+2:
+Flow horizontally by +δu, +δv, −δu, −δv, projecting to H at each leg
+3:
+Compute ∆□δ (u, v) via least–squares alignment to Lie generators; set H(δ) ←
+∥∆□δ (u, v)∥/δ 2
+4: end for
+4H(ε/2) − H(ε)
+5: return H ⋆ =
+(bias O(ε2 )); report |H ⋆ − H(ε/2)| as an error proxy
+3
+Complexity at a glance. Let m = h(d2k +d2v ); RoPE reduces d2k → dk per head. Forming
+A⊤ A costs O(m2 D) for parameter dimension D, and solving costs O(m3 ) (dense) or O(mD)
+per CG iteration. At h=12, dk =dv =64 one has m ≈ 98,304, so FR projectors and holonomy
+become expensive; this is why Section 7 uses Euclidean proxies while Section 5 exposes
+FR–exact routines.
+Deterministic gauge–fix (for reproducibility, not theory). To make measurements
+repeatable, we select a canonical representative on each orbit by: (i) thin–QR with positive
+diagonals for V /O and the induced block update on WO ; (ii) plane–wise Gram balancing
+for Q/K within the RoPE commutant; (iii) deterministic head ordering by a fixed tie–break
+rule (e.g., lexicographic on row–major WO blocks). This is a section choice—it does not
+constrain the theory—and affects only how we display or cache parameters.
+Minimal reproducibility notes. Hardware: H100 (95 GB); CUDA 12.1; PyTorch 2.4.1;
+float64. Seeds: 42; fixed evaluation batch for Fisher quantities; dataloader shuffling off
+for invariance checks. Tolerances: QR pivot threshold 10−10 ; linear–solve residuals 10−10 ;
+Euclidean vertical–fraction threshold 10−4 in plots. All scripts use the same random seeds
+and fixed batch to ensure comparability across runs.
+
+1001
+1002
+1003
+1004
+1005
+1006
+
+G
+
+1007
+1008
+1009
+1010
+1011
+1012
+
+Environment and common settings. Unless stated otherwise, computations use
+float64 on a single H100 (95 GB), CUDA 12.1, PyTorch 2.4.1, with TF32 disabled. The
+global seed is 42. A single evaluation batch is used throughout to define Fisher–Rao quantities and to keep all comparisons on identical data. The architecture matches Section 2
+(e.g., h=12, dk =dv =64 in the invariance experiment). Thin–QR with column pivoting is
+used with a pivot tolerance of 10−10 ; linear solves stop at relative residual 10−10 .
+
+1013
+1014
+1015
+1016
+1017
+1018
+
+Deterministic gauge–fix (for repeatability, not theory). To make outputs bytewise
+identical across runs, we pick a canonical representative per gauge orbit: (i) thin–QR with
+positive diagonals for V /O and the induced block update in WO ; (ii) plane–wise Gram balancing for Q/K within the RoPE commutant; (iii) a fixed head order by a simple tie–break
+rule. This is a section choice only; it does not constrain the theory or diagnostics (see
+Section F).
+
+1019
+1020
+1021
+1022
+1023
+
+Gauge invariance (Table 2). We sample (Ai , Ci ) ∈ GL(dk ) × GL(dv ) per head with
+prescribed condition numbers (via thin–QR on random draws), optionally permute heads,
+apply
+
+1024
+1025
+
+Experimental Configuration and Procedures
+
+This note collects the minimal details needed to reproduce the figures in Section 7. We
+keep the setup intentionally simple and fixed: one hardware/software stack, one evaluation
+batch, and a deterministic gauge–fix used only for display consistency.
+
+(i)
+
+(i)
+
+(i)
+
+(i)
+
+(i)
+
+(WQ , WK ) 7→ (WQ Ai , WK A−⊤
+i ),
+
+(i)
+
+(WV , WO ) 7→ (WV Ci , Ci−1 WO ),
+
+evaluate on the fixed batch, and report ∥Y ′ − Y ∥/∥Y ∥.
+cross–head mixing) yield Θ(1) changes.
+19
+
+Controls outside Gmax (e.g.,
+
+Under review as a conference paper at ICLR 2025
+
+1026
+1027
+1028
+1029
+1030
+1031
+1032
+1033
+1034
+1035
+1036
+1037
+
+Gauge–aware split (Figure 1). We compute per–sample gradients for a mean–squared
+reconstruction objective and apply the Euclidean proxy of Algorithm 1: stack numerically
+independent vertical generators into a matrix A (thin–QR with pivoting), solve (A⊤ A +
+λI)c = A⊤ ∇L (with optional λ ∈ [10−10 , 10−6 ]), and report the normalized Euclidean
+vertical fraction ∥Ac∥/∥∇L∥ along with residuals ∥Ac − ∇L∥/∥∇L∥ as a fit diagnostic.
+Fisher–Rao counterparts (for future scale). The FR–exact projector and the
+small–loop holonomy estimator are given in Algorithm 1 and Algorithm 4, with derivations in §B and §C. They require Gram systems on the vertical basis and horizontal projections along the loop, which are costly at large m = h(d2k +d2v ) (RoPE reduces d2k → dk per
+head). We therefore use the Euclidean proxy for Section 7 and provide the FR procedures
+as ready-made routines for future large-scale evaluation.
+
+1038
+1039
+1040
+1041
+1042
+1043
+1044
+1045
+1046
+1047
+1048
+1049
+1050
+1051
+1052
+1053
+1054
+1055
+1056
+1057
+1058
+1059
+1060
+1061
+1062
+1063
+1064
+1065
+1066
+1067
+1068
+1069
+1070
+1071
+1072
+1073
+1074
+1075
+1076
+1077
+1078
+1079
+
+20
+
+

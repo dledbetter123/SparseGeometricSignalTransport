@@ -1,0 +1,35 @@
+# ── OS / editor noise ────────────────────────────────────────────────
+.DS_Store
+**/.DS_Store
+.ipynb_checkpoints/
+__pycache__/
+*.pyc
+*.log
+
+# ── Sensitive: thesis LaTeX renderings (masters thesis / Evernote export) ──
+# Not for public distribution. Source of truth lives outside the repo.
+thesis_constrained/
+thesis_constrained-3/
+thesis_constrained.zip
+**/thesis_figures/
+
+# ── Sensitive: unpublishable research lines (IP-constrained) ──────────
+# Topology / gauge-arch internals are held back pending IP clearance.
+topology_arch/
+topology/
+
+# ── Copyrighted / third-party material (do not redistribute) ──────────
+papers/
+*.pdf
+
+# ── Heavy training artifacts (regenerable; keep the repo lean) ────────
+*.pt
+*.ckpt
+*.safetensors
+runs/
+tiny_shakespeare.txt
+wikitext*/
+*.bin
+
+# ── Local agent scratch ───────────────────────────────────────────────
+.claude/
