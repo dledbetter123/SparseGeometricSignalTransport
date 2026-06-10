@@ -69,13 +69,13 @@ This is a research repository, and the negative results are load-bearing.
 - **Parity was never reached.** The closest-to-GPT number (V12.1, within 0.12 BPC) came from the *conventional* SSM+MLP components, not the geometry. The project's own settled position: **"attention is a local optimum in the space of geometric sequence processors"** — not the global best, but every nearby alternative tested so far performs worse at equal compute.
 - **What genuinely survived every ablation:** content-dependent state transitions; a per-token nonlinearity (the FFN is the *only* nonlinear feature-mixer in the stack); the irfft round-trip (removing it NaNs by step 5500 — it is structurally load-bearing for stability); associative *matrix*-fiber memory ($q@S$ retrieval beats scalar EMA); and **complex-valued state**, because phase is how holonomy is stored and real states provably cannot track the parity/path information that complex states can.
 
-### The transferable win: a curvature-based positional encoding
+### The most promising direction: a curvature-based positional encoding
 
-The program's clearest applied contribution is a **curvature-based positional encoding** that adds a content-dependent curvature term to the attention logits:
+The program's most promising applied direction is a **curvature-based positional encoding** that adds a content-dependent curvature term to the attention logits. These are early, encouraging results that require further study — especially at scale — but the direction is promising given where the geometry points:
 
 $$\text{score}_{ij} = \frac{q_i\cdot k_j}{\sqrt{d}} \;-\; \int_i^j \kappa(t)\,dt$$
 
-In the gauge hierarchy, absolute/relative encodings are flat connections and **RoPE is a flat $U(1)$ connection (zero curvature)**; this encoding is the first member with *nonzero, learned, content-dependent curvature*. It improved perplexity by **~9% over RoPE at 14M params** (48.6 vs 53.4) and remained ahead at 77M and at sequence length 3072 — while being a **drop-in** addition compatible with FlashAttention and KV caching, at $O(T^2)$ *scalar* overhead ($d\times$ cheaper than attention itself). The geometric lens did not replace attention; it *improved* it, which is the more defensible scientific outcome.
+In the gauge hierarchy, absolute/relative encodings are flat connections and **RoPE is a flat $U(1)$ connection (zero curvature)**; this encoding is the first member with *nonzero, learned, content-dependent curvature*. It improved perplexity by **~9% over RoPE at 14M params** (48.6 vs 53.4) and remained ahead at 77M and at sequence length 3072 — while being a **drop-in** addition compatible with FlashAttention and KV caching, at $O(T^2)$ *scalar* overhead ($d\times$ cheaper than attention itself). These remain preliminary findings that warrant further study before any strong claim, but they suggest the geometric lens can *improve* attention rather than replace it — the more defensible scientific outcome to pursue.
 
 ---
 
