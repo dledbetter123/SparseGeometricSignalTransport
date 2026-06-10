@@ -1,1 +1,1 @@
-A geometric theory of the transformer: attention as parallel transport on a fiber bundle, not an O(T²) tax. Tokens become sparse Fourier constellations. It never beat GPT outright — but produced CurvBias, a drop-in positional encoding that beats RoPE.
+A geometric theory of the transformer: attention as parallel transport on a fiber bundle, not an O(T²) tax. Tokens become sparse Fourier constellations. It never beat GPT outright — but produced a drop-in, curvature-based positional encoding that beats RoPE.

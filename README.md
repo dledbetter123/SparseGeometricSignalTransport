@@ -69,13 +69,13 @@ This is a research repository, and the negative results are load-bearing.
 - **Parity was never reached.** The closest-to-GPT number (V12.1, within 0.12 BPC) came from the *conventional* SSM+MLP components, not the geometry. The project's own settled position: **"attention is a local optimum in the space of geometric sequence processors"** — not the global best, but every nearby alternative tested so far performs worse at equal compute.
 - **What genuinely survived every ablation:** content-dependent state transitions; a per-token nonlinearity (the FFN is the *only* nonlinear feature-mixer in the stack); the irfft round-trip (removing it NaNs by step 5500 — it is structurally load-bearing for stability); associative *matrix*-fiber memory ($q@S$ retrieval beats scalar EMA); and **complex-valued state**, because phase is how holonomy is stored and real states provably cannot track the parity/path information that complex states can.
 
-### The transferable win: CurvBias
+### The transferable win: a curvature-based positional encoding
 
-The program's clearest applied contribution is a positional encoding, **CurvBias**, that adds a content-dependent curvature term to the attention logits:
+The program's clearest applied contribution is a **curvature-based positional encoding** that adds a content-dependent curvature term to the attention logits:
 
 $$\text{score}_{ij} = \frac{q_i\cdot k_j}{\sqrt{d}} \;-\; \int_i^j \kappa(t)\,dt$$
 
-In the gauge hierarchy, absolute/relative encodings are flat connections and **RoPE is a flat $U(1)$ connection (zero curvature)**; CurvBias is the first member with *nonzero, learned, content-dependent curvature*. It improved perplexity by **~9% over RoPE at 14M params** (48.6 vs 53.4) and remained ahead at 77M and at sequence length 3072 — while being a **drop-in** addition compatible with FlashAttention and KV caching, at $O(T^2)$ *scalar* overhead ($d\times$ cheaper than attention itself). The geometric lens did not replace attention; it *improved* it, which is the more defensible scientific outcome.
+In the gauge hierarchy, absolute/relative encodings are flat connections and **RoPE is a flat $U(1)$ connection (zero curvature)**; this encoding is the first member with *nonzero, learned, content-dependent curvature*. It improved perplexity by **~9% over RoPE at 14M params** (48.6 vs 53.4) and remained ahead at 77M and at sequence length 3072 — while being a **drop-in** addition compatible with FlashAttention and KV caching, at $O(T^2)$ *scalar* overhead ($d\times$ cheaper than attention itself). The geometric lens did not replace attention; it *improved* it, which is the more defensible scientific outcome.
 
 ---
 
@@ -86,7 +86,7 @@ The honest framing of the negative results sharpens, rather than abandons, the e
 1. **Expand the fiber bundle from scalar to matrix to operator.** Move state capacity from $\sim\!10^3$ toward $10^4$ per layer by widening the matrix fiber ($K=8 \to 32$) and giving each mode a genuine associative store, directly attacking the 128× gap.
 2. **Go complex, deliberately.** Phase is the holonomy; complex/unitary state is the only representation that preserves path information. Combine **$U(K)$ unitary transport** (gauge theory) with the **delta rule** (selective overwrite from SSM research) — the single untried cell in the six-way convergence table, and the design's best shot at attention-level selectivity at sub-quadratic cost.
 3. **Sparse and learned-band FFT.** $O(s\log s)$ transport on differentiable frequency masks, with blocks specializing to different bands — a true multi-scale spectral hierarchy via wavelets rather than a single global FFT.
-4. **Ship CurvBias at scale.** Apply it to LLaMA/Mistral-class models during continued pretraining; it needs no architectural surgery and the only open question is whether the geometric signal grows or fades with scale.
+4. **Ship the curvature encoding at scale.** Apply it to LLaMA/Mistral-class models during continued pretraining; it needs no architectural surgery and the only open question is whether the geometric signal grows or fades with scale.
 5. **Formalize the correspondence.** Prove the conjectured theorems: DFT basis as parallel-transport eigenfunctions, the spectral kernel as holonomy, IFFT as section reconstruction, top-$k$ as a Stiefel retraction.
 
 The bet is not "geometry beats attention tomorrow." It is that a **complex-valued, capacity-matched, sparse-spectral fiber bundle with selective (delta-rule) transport** is the most promising sub-quadratic generative architecture in the design space the convergence points at — and that the geometric framing is what tells you *which* operations to spend the next order of magnitude of compute on, instead of guessing.
@@ -98,7 +98,7 @@ The bet is not "geometry beats attention tomorrow." It is that a **complex-value
 | Path | What it holds |
 |---|---|
 | `v5…v21/` | Iteration-by-iteration architectures, generators, and notebooks. Each `gen_notebook_*.py` is the source of truth for its `.ipynb`. |
-| `study_exhaustive/` | The literature/foundations units: fiber bundles & gauge theory, Finsler geometry, spectral methods, compressed sensing, Hopfield/energy models, CurvBias position encoding. |
+| `study_exhaustive/` | The literature/foundations units: fiber bundles & gauge theory, Finsler geometry, spectral methods, compressed sensing, Hopfield/energy models, curvature-based position encoding. |
 | `docs/handoffs/` | Dated session handoffs — the live reasoning trail, including the V12 spectral→constellation arc and its stabilization. |
 | `v14/mathematical_foundations.md`, `v18/audit_*.md` | The formal axioms and the honest mid-project audit (the 128× capacity finding). |
 | `v19/`, `v20/`, `v21/` | Forward design documents: $U(K)$ + delta rule, the capacity program, and the "landscape" reframing. |
