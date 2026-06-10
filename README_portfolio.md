@@ -1,3 +1,1 @@
-A geometric theory of the transformer: what if attention is really parallel transport of information along a learned connection — making its O(T²) cost one expensive option, not the only one? Tokens become sparse constellations of Fourier modes; shared modes are the connections. Across 21 iterations the geometry never beat GPT outright, but it produced CurvBias — a drop-in positional encoding that improves perplexity ~9% over RoPE. The bet: complex, sparse, capacity-matched fiber-bundle transport is the most promising sub-quadratic path to efficient generation.
-
-Click through for the full thesis-level writeup.
+A geometric theory of the transformer: attention as parallel transport on a fiber bundle, not an O(T²) tax. Tokens become sparse Fourier constellations. It never beat GPT outright — but produced CurvBias, a drop-in positional encoding that beats RoPE by ~9%.
